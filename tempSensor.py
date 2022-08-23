@@ -2,11 +2,26 @@
 # -*- coding: utf-8 -*-
 #----------------------------------------------------------------------------
 # Created By  : Grupo 3 - Sistemas Distribuidos
-
+import os
 from datetime import datetime, timezone
 import sys
 import requests
 import time
+import uuid
+import boto3
+
+db = boto3.client('dynamodb',
+  aws_access_key_id='AKIAWCB2QHJSQDUZYIMS',
+  aws_secret_access_key='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',
+  region_name='us-east-1')
+
+
+def lambda_handler(event, context):
+    DB_HOST = os.environ["DB_HOST"]
+    DB_USER = os.environ["DB_USER"]
+    DB_PASS = os.environ["DB_PASS"]
+    print("Connected to %s as %s" % (DB_HOST, DB_USER))
+    return None
 
 #URL base de API Kaiterra y APIKEY del sensor
 API_BASE_URL = "https://api.kaiterra.com/v1/"
@@ -79,9 +94,41 @@ def parse_rfc3339_utc(ts: str) -> datetime:
     return datetime.strptime(ts, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc)
 
 
+def putData(id: str):
+    id_register = str(uuid.uuid4())
+    data = get_laser_egg(id)
+    latest_data = data.get('info.aqi')
+
+    db.put_item(
+        TableName='Kaiterra',
+        Item=
+        {
+            'id': {
+                'S': id_register
+            },
+            'deviceID': {
+                'S': id
+            },
+            'humidity': {
+                'N': str(latest_data['data'].get('humidity'))
+            },
+            'rco2': {
+                'N': str(latest_data['data'].get('rco2 (ppm)'))
+            },
+            'temp': {
+                'N': str(latest_data['data'].get('temp'))
+            }
+        }
+    )
+    print("Added item")
+    return None
+
 if __name__ == "__main__":
     check_available("requests")
     from datetime import datetime, timezone
+
     while True:
         summarize_laser_egg("dd85475c-a5ef-4a15-b00f-206e408528b2") #obtiene valores del Kaiterra con el ID
+        putData("dd85475c-a5ef-4a15-b00f-206e408528b2")
         time.sleep(10)
+
